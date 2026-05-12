@@ -118,42 +118,43 @@ export default function App() {
   }, [messages, isLoading]);
 
   const callGeminiAPI = async (chatHistory) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // API 키는 환경에서 자동 제공됨
+    // 1. Vercel에서 설정한 환경 변수로부터 키를 가져옵니다.
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    // 2. 최신 Gemini 3 Flash 모델 주소입니다.
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`;
-    // API가 요구하는 형식으로 메시지 히스토리 변환
-    const formattedContents = chatHistory.map(msg => ({
-      role: msg.role,
-      parts: [{ text: msg.text }]
-    }));
 
+    // 3. 구글 서버가 이해할 수 있는 최신 데이터 형식(Payload)입니다.
     const payload = {
-      contents: formattedContents,
+      contents: chatHistory.map(msg => ({
+        role: msg.role === 'model' ? 'model' : 'user',
+        parts: [{ text: msg.text }]
+      })),
       systemInstruction: {
         parts: [{ text: SYSTEM_PROMPT }]
       }
     };
 
-    let retries = 5;
-    let delay = 1000;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    while (retries > 0) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error('API Request Failed');
-        
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "앗, 잠깐 생각이 꼬였어. 다시 한번 말해줄래?";
-      } catch (error) {
-        retries--;
-        if (retries === 0) return "미안해, 지금 네트워크 연결이 조금 불안정한 것 같아. 잠시 후 다시 시도해줄래? 😢";
-        await new Promise(res => setTimeout(res, delay));
-        delay *= 2;
+      // 만약 400 에러 등이 발생하면 이 블록이 실행됩니다.
+      if (!response.ok) {
+        const errorData = await response.json();
+        // ★ F12 콘솔창에 이 내용이 찍히게 됩니다!
+        console.error("구글 서버의 상세 답변:", errorData);
+        throw new Error('API 호출 실패');
       }
+      
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 대답을 못 찾았어. 다시 말해줄래?";
+
+    } catch (error) {
+      console.error("에러 발생:", error);
+      return "미안해, 지금 네트워크 연결이 조금 불안정한 것 같아. 잠시 후 다시 시도해줄래? 😢";
     }
   };
 
