@@ -118,47 +118,53 @@ export default function App() {
   }, [messages, isLoading]);
 
  const callGeminiAPI = async (chatHistory) => {
+    // 1. Vercel 환경 변수에서 키를 가져옵니다. 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    // 가장 범용적인 v1 버전의 gemini-1.5-flash 모델을 사용합니다.
+
+    // 만약 키가 없다면 에러를 미리 방지합니다.
+    if (!apiKey) {
+      console.error("API 키가 설정되지 않았습니다. Vercel 설정을 확인하세요.");
+      return "지나의 열쇠(API Key)를 찾을 수 없어. 선생님께 확인해줄래?";
+    }
+
+    // 2. 가장 안정적인 v1 버전과 표준 모델 명칭을 사용합니다.
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // [핵심 변경 사항] 
-    // 에러를 유발하는 system_instruction 필드를 사용하지 않고, 
-    // 첫 번째 사용자 메시지에 '지나'의 규칙(SYSTEM_PROMPT)을 합쳐서 보냅니다.
+    // 3. API 규칙: 지나의 첫 인사말을 제외하고 학생의 메시지부터 전달합니다.
     const apiHistory = chatHistory.slice(1).map((msg, index) => {
       let text = msg.text;
-      // 첫 번째 사용자 메시지 앞에만 시스템 인스트럭션을 몰래 붙여줍니다.
+      
+      // [핵심] 첫 번째 학생 메시지에 '지나'의 모든 규칙을 합쳐서 보냅니다.
+      // 이렇게 하면 'system_instruction' 필드 오류(400)를 완벽히 피할 수 있습니다.
       if (index === 0 && msg.role === 'user') {
-        text = `[시스템 지침: 너는 '지나'야. 아래 규칙을 반드시 따라줘: ${SYSTEM_PROMPT}]\n\n사용자 질문: ${msg.text}`;
+        text = `[지시사항: 너는 목일중학교 AI 수학 파트너 '지나'야. 아래 규칙을 반드시 지켜줘: ${SYSTEM_PROMPT}]\n\n학생의 첫 질문: ${msg.text}`;
       }
+      
       return {
         role: msg.role === 'model' ? 'model' : 'user',
         parts: [{ text: text }]
       };
     });
 
-    const payload = {
-      contents: apiHistory
-    };
-
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ contents: apiHistory })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("구글 서버 답변:", errorData);
+        console.error("구글 서버 최종 답변:", errorData);
+        // 여기서 404가 뜬다면 모델 이름 문제, 400이 뜬다면 형식 문제입니다.
         throw new Error('API 호출 실패');
       }
       
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 잠시 생각에 빠졌어. 다시 말해줄래?";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 잠시 생각에 빠졌어. 다시 말해볼까?";
 
     } catch (error) {
-      console.error("최종 에러 발생:", error);
+      console.error("최종 에러:", error);
       return "연결에 문제가 생겼어. 잠시 후 다시 시도해줘! 😢";
     }
   };
