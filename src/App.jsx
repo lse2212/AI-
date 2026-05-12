@@ -129,7 +129,7 @@ export default function App() {
         role: msg.role === 'model' ? 'model' : 'user',
         parts: [{ text: msg.text }]
       })),
-      systemInstruction: {
+      system_instruction: {
         parts: [{ text: SYSTEM_PROMPT }]
       }
     };
