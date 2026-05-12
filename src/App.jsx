@@ -119,22 +119,18 @@ export default function App() {
 
  const callGeminiAPI = async (chatHistory) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    // 1. 가장 안정적인 v1beta 주소를 사용합니다.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 1. 가장 안정적인 v1 버전 주소를 사용합니다.
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // 2. 대화 기록에서 지나의 첫 인사(index 0)를 제외하고, 
-    //    학생의 첫 질문부터 서버에 전달되도록 필터링합니다. (API 필수 규칙)
+    // 2. 대화 기록에서 지나의 첫 인사(index 0)를 제외하고 보냅니다. (API 필수 규칙)
     const apiHistory = chatHistory.slice(1).map(msg => ({
       role: msg.role === 'model' ? 'model' : 'user',
       parts: [{ text: msg.text }]
     }));
 
-    // 3. 만약 학생의 첫 질문이 아직 없다면(비어있다면) 요청을 보내지 않습니다.
-    if (apiHistory.length === 0) return "어떤 간식을 팔고 싶니?";
-
     const payload = {
       contents: apiHistory,
-      // 철자를 정확히 입력했습니다: system_instruction
+      // 3. v1 버전에서 시스템 지침을 인식하는 표준 필드명인 'system_instruction'을 사용합니다.
       system_instruction: { 
         parts: [{ text: SYSTEM_PROMPT }]
       }
@@ -149,17 +145,16 @@ export default function App() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("구글 서버 상세 답변:", errorData);
+        console.error("구글 서버의 상세 답변:", errorData);
         throw new Error('API 호출 실패');
       }
       
       const data = await response.json();
-      // 답변이 올바르게 왔는지 확인합니다.
       return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 대답을 못 찾았어. 다시 말해줄래?";
 
     } catch (error) {
-      console.error("최종 에러:", error);
-      return "연결이 조금 불안정해. 잠시 후 다시 시도해줘! 😢";
+      console.error("에러 발생:", error);
+      return "연결에 문제가 생겼어. 잠시 후 다시 시도해줘! 😢";
     }
   };
 
