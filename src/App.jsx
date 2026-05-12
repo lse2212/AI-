@@ -118,7 +118,6 @@ export default function App() {
   }, [messages, isLoading]);
 
  const callGeminiAPI = async (chatHistory) => {
-    // [중요] .trim()을 추가하여 혹시 모를 API 키 앞뒤의 공백을 제거합니다.
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
 
     if (!apiKey) {
@@ -126,13 +125,12 @@ export default function App() {
       return "지나의 열쇠가 없어! Vercel 설정을 확인해줘.";
     }
 
-    // [최종 주소] 2026년 가장 안정적인 v1 주소와 gemini-3-flash 모델 조합입니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`;
+    // [해결 포인트] 주소를 v1에서 v1beta로 변경했습니다.
+    // Gemini 3 Flash 모델은 v1beta 경로에서 generateContent를 지원합니다.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
 
-    // API 규칙: 지나의 첫 인사를 제외하고 학생의 질문부터 전달합니다.
     const apiHistory = chatHistory.slice(1).map((msg, index) => {
       let text = msg.text;
-      // 400 에러를 피하기 위해 시스템 지침을 첫 메시지에 직접 합칩니다.
       if (index === 0 && msg.role === 'user') {
         text = `[지시사항: 너는 목일중 수학 파트너 '지나'야. 아래 규칙을 지켜줘: ${SYSTEM_PROMPT}]\n\n학생 질문: ${msg.text}`;
       }
@@ -149,7 +147,6 @@ export default function App() {
         body: JSON.stringify({ contents: apiHistory })
       });
 
-      // 만약 여전히 404가 뜬다면, 콘솔에 찍히는 이 메시지가 결정적 힌트가 됩니다.
       if (!response.ok) {
         const errorData = await response.json();
         console.error("❗ 구글 서버 최종 응답:", errorData);
