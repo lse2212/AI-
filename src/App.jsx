@@ -118,24 +118,23 @@ export default function App() {
   }, [messages, isLoading]);
 
  const callGeminiAPI = async (chatHistory) => {
-    // 1. 키를 가져옵니다.
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    // [중요] .trim()을 추가하여 혹시 모를 API 키 앞뒤의 공백을 제거합니다.
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
 
-    // [디버깅] 콘솔창에 키의 앞 4자리만 찍어봅니다. (키가 잘 로드되는지 확인용)
     if (!apiKey) {
-      console.error("❌ 에러: VITE_GEMINI_API_KEY를 찾을 수 없습니다. Vercel 설정을 확인하세요!");
-    } else {
-      console.log("✅ 키 로드 성공 (앞 4자리):", apiKey.substring(0, 4));
+      console.error("❌ API 키를 읽어오지 못했습니다.");
+      return "지나의 열쇠가 없어! Vercel 설정을 확인해줘.";
     }
 
-    // 2. 가장 호환성이 높은 v1beta 주소와 gemini-1.5-flash 조합으로 다시 시도합니다.
-    // (만약 1.5가 성공하면, 그 다음 줄만 gemini-3-flash로 바꾸면 됩니다.)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // [최종 주소] 2026년 가장 안정적인 v1 주소와 gemini-3-flash 모델 조합입니다.
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`;
 
+    // API 규칙: 지나의 첫 인사를 제외하고 학생의 질문부터 전달합니다.
     const apiHistory = chatHistory.slice(1).map((msg, index) => {
       let text = msg.text;
+      // 400 에러를 피하기 위해 시스템 지침을 첫 메시지에 직접 합칩니다.
       if (index === 0 && msg.role === 'user') {
-        text = `[지시사항: 너는 목일중 수학 파트너 '지나'야. 규칙: ${SYSTEM_PROMPT}]\n\n학생 질문: ${msg.text}`;
+        text = `[지시사항: 너는 목일중 수학 파트너 '지나'야. 아래 규칙을 지켜줘: ${SYSTEM_PROMPT}]\n\n학생 질문: ${msg.text}`;
       }
       return {
         role: msg.role === 'model' ? 'model' : 'user',
@@ -150,17 +149,18 @@ export default function App() {
         body: JSON.stringify({ contents: apiHistory })
       });
 
+      // 만약 여전히 404가 뜬다면, 콘솔에 찍히는 이 메시지가 결정적 힌트가 됩니다.
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❗ 구글 서버 답변 (상세):", errorData);
-        throw new Error(`API 호출 실패 (상태 코드: ${response.status})`);
+        console.error("❗ 구글 서버 최종 응답:", errorData);
+        throw new Error(`에러 발생 (상태 코드: ${response.status})`);
       }
       
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 답변을 찾지 못했어.";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 답변을 준비하지 못했어.";
 
     } catch (error) {
-      console.error("최종 에러:", error);
+      console.error("최종 에러 내역:", error);
       return "연결에 문제가 생겼어. 잠시 후 다시 시도해줘! 😢";
     }
   };
