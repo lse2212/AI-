@@ -117,19 +117,22 @@ export default function App() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const callGeminiAPI = async (chatHistory) => {
-    // 1. Vercel에서 설정한 환경 변수로부터 키를 가져옵니다.
+ const callGeminiAPI = async (chatHistory) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    // 2. 최신 Gemini 3 Flash 모델 주소입니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`;
+    // 1. v1beta 주소를 사용해야 'system_instruction'을 완벽하게 인식합니다.
+    // 2. 모델명을 안정적인 'gemini-1.5-flash'로 설정합니다.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // 3. 구글 서버가 이해할 수 있는 최신 데이터 형식(Payload)입니다.
+    // API 규칙: 대화 기록(contents)은 반드시 'user'의 메시지로 시작해야 합니다.
+    // 따라서 지나의 첫 인사(첫 번째 model 메시지)를 제외하고 보냅니다.
+    const apiHistory = chatHistory.slice(1).map(msg => ({
+      role: msg.role === 'model' ? 'model' : 'user',
+      parts: [{ text: msg.text }]
+    }));
+
     const payload = {
-      contents: chatHistory.map(msg => ({
-        role: msg.role === 'model' ? 'model' : 'user',
-        parts: [{ text: msg.text }]
-      })),
-      system_instruction: {
+      contents: apiHistory,
+      system_instruction: { 
         parts: [{ text: SYSTEM_PROMPT }]
       }
     };
@@ -141,10 +144,8 @@ export default function App() {
         body: JSON.stringify(payload)
       });
 
-      // 만약 400 에러 등이 발생하면 이 블록이 실행됩니다.
       if (!response.ok) {
         const errorData = await response.json();
-        // ★ F12 콘솔창에 이 내용이 찍히게 됩니다!
         console.error("구글 서버의 상세 답변:", errorData);
         throw new Error('API 호출 실패');
       }
@@ -154,7 +155,7 @@ export default function App() {
 
     } catch (error) {
       console.error("에러 발생:", error);
-      return "미안해, 지금 네트워크 연결이 조금 불안정한 것 같아. 잠시 후 다시 시도해줄래? 😢";
+      return "연결에 문제가 생겼어. 잠시 후 다시 시도해줘! 😢";
     }
   };
 
