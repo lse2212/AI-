@@ -119,21 +119,26 @@ export default function App() {
 
  const callGeminiAPI = async (chatHistory) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    // 1. 가장 안정적인 v1 버전 주소를 사용합니다.
+    // 가장 범용적인 v1 버전의 gemini-1.5-flash 모델을 사용합니다.
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // 2. 대화 기록에서 지나의 첫 인사(index 0)를 제외하고 보냅니다. (API 필수 규칙)
-    const apiHistory = chatHistory.slice(1).map(msg => ({
-      role: msg.role === 'model' ? 'model' : 'user',
-      parts: [{ text: msg.text }]
-    }));
+    // [핵심 변경 사항] 
+    // 에러를 유발하는 system_instruction 필드를 사용하지 않고, 
+    // 첫 번째 사용자 메시지에 '지나'의 규칙(SYSTEM_PROMPT)을 합쳐서 보냅니다.
+    const apiHistory = chatHistory.slice(1).map((msg, index) => {
+      let text = msg.text;
+      // 첫 번째 사용자 메시지 앞에만 시스템 인스트럭션을 몰래 붙여줍니다.
+      if (index === 0 && msg.role === 'user') {
+        text = `[시스템 지침: 너는 '지나'야. 아래 규칙을 반드시 따라줘: ${SYSTEM_PROMPT}]\n\n사용자 질문: ${msg.text}`;
+      }
+      return {
+        role: msg.role === 'model' ? 'model' : 'user',
+        parts: [{ text: text }]
+      };
+    });
 
     const payload = {
-      contents: apiHistory,
-      // 3. v1 버전에서 시스템 지침을 인식하는 표준 필드명인 'system_instruction'을 사용합니다.
-      system_instruction: { 
-        parts: [{ text: SYSTEM_PROMPT }]
-      }
+      contents: apiHistory
     };
 
     try {
@@ -145,15 +150,15 @@ export default function App() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("구글 서버의 상세 답변:", errorData);
+        console.error("구글 서버 답변:", errorData);
         throw new Error('API 호출 실패');
       }
       
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 대답을 못 찾았어. 다시 말해줄래?";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 잠시 생각에 빠졌어. 다시 말해줄래?";
 
     } catch (error) {
-      console.error("에러 발생:", error);
+      console.error("최종 에러 발생:", error);
       return "연결에 문제가 생겼어. 잠시 후 다시 시도해줘! 😢";
     }
   };
