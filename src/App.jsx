@@ -118,26 +118,18 @@ export default function App() {
   }, [messages, isLoading]);
 
  const callGeminiAPI = async (chatHistory) => {
-    // 1. Vercel 환경 변수에서 키를 가져옵니다. 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    
+    // [최종 확정] 2026년 표준인 v1 주소와 gemini-3-flash 모델명을 사용합니다.
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`;
 
-    // 만약 키가 없다면 에러를 미리 방지합니다.
-    if (!apiKey) {
-      console.error("API 키가 설정되지 않았습니다. Vercel 설정을 확인하세요.");
-      return "지나의 열쇠(API Key)를 찾을 수 없어. 선생님께 확인해줄래?";
-    }
-
-    // 2. 가장 안정적인 v1 버전과 표준 모델 명칭을 사용합니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    // 3. API 규칙: 지나의 첫 인사말을 제외하고 학생의 메시지부터 전달합니다.
+    // 지나의 인사를 제외하고 학생의 질문부터 보냅니다. (API 필수 규칙)
     const apiHistory = chatHistory.slice(1).map((msg, index) => {
       let text = msg.text;
       
-      // [핵심] 첫 번째 학생 메시지에 '지나'의 모든 규칙을 합쳐서 보냅니다.
-      // 이렇게 하면 'system_instruction' 필드 오류(400)를 완벽히 피할 수 있습니다.
+      // system_instruction 필드 오류(400)를 피하기 위해 첫 메시지에 지침을 주입합니다.
       if (index === 0 && msg.role === 'user') {
-        text = `[지시사항: 너는 목일중학교 AI 수학 파트너 '지나'야. 아래 규칙을 반드시 지켜줘: ${SYSTEM_PROMPT}]\n\n학생의 첫 질문: ${msg.text}`;
+        text = `[지시사항: 너는 목일중 수학 파트너 '지나'야. 규칙: ${SYSTEM_PROMPT}]\n\n학생 질문: ${msg.text}`;
       }
       
       return {
@@ -156,12 +148,11 @@ export default function App() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("구글 서버 최종 답변:", errorData);
-        // 여기서 404가 뜬다면 모델 이름 문제, 400이 뜬다면 형식 문제입니다.
         throw new Error('API 호출 실패');
       }
       
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 잠시 생각에 빠졌어. 다시 말해볼까?";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "지나가 답변을 찾지 못했어.";
 
     } catch (error) {
       console.error("최종 에러:", error);
