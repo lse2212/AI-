@@ -127,7 +127,7 @@ export default function App() {
 
     // [해결 포인트] 주소를 v1에서 v1beta로 변경했습니다.
     // Gemini 3 Flash 모델은 v1beta 경로에서 generateContent를 지원합니다.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const apiHistory = chatHistory.slice(1).map((msg, index) => {
       let text = msg.text;
